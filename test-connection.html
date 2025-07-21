@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Koneksi Server - Anastasya Vocal CMS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Koneksi Server - Anastasya Vocal CMS</h1>
+        <p>Tool ini membantu mendiagnosis masalah koneksi server pada aplikasi Anda.</p>
+        
+        <button onclick="testAllConnections()">Test Semua Koneksi</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+        
+        <div id="results"></div>
+        
+        <h3>Log Detail:</h3>
+        <div id="logs" class="log"></div>
+        
+        <h3>Panduan Troubleshooting:</h3>
+        <ul>
+            <li><strong>Jika semua test gagal:</strong> Server PHP tidak berjalan. Jalankan XAMPP/WAMP atau PHP built-in server.</li>
+            <li><strong>Jika ada CORS error:</strong> Cek konfigurasi di <code>backend/config/cors.php</code></li>
+            <li><strong>Jika database error:</strong> Pastikan MySQL berjalan dan database sudah diimport.</li>
+            <li><strong>Jika 404 error:</strong> Cek path folder dan struktur project.</li>
+        </ul>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost/anastasya-vocal-cms/backend/api';
+        
+        const endpoints = [
+            { name: 'Theme Settings', url: '/theme.php' },
+            { name: 'Content Text', url: '/content.php' },
+            { name: 'Pricing Packages', url: '/packages.php' },
+            { name: 'Testimonials', url: '/testimonials.php' },
+            { name: 'News Articles', url: '/news.php' },
+            { name: 'Gallery Images', url: '/gallery.php' }
+        ];
+
+        function log(message) {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logsDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testEndpoint(endpoint) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-item loading';
+            resultDiv.innerHTML = `<strong>${endpoint.name}</strong><br>Testing ${API_BASE_URL}${endpoint.url}...`;
+            document.getElementById('results').appendChild(resultDiv);
+
+            log(`Testing ${endpoint.name}: ${API_BASE_URL}${endpoint.url}`);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint.url}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+
+                log(`Response status: ${response.status} ${response.statusText}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                log(`Response data: ${JSON.stringify(data, null, 2)}`);
+
+                resultDiv.className = 'test-item success';
+                resultDiv.innerHTML = `
+                    <strong>${endpoint.name}</strong> ✅<br>
+                    Status: ${response.status} OK<br>
+                    Data: ${data.success ? 'Valid JSON response' : 'Response received'}
+                `;
+
+            } catch (error) {
+                log(`Error: ${error.message}`);
+
+                resultDiv.className = 'test-item error';
+                let errorMessage = error.message;
+                
+                if (error.message.includes('fetch')) {
+                    errorMessage = 'Tidak dapat terhubung ke server. Pastikan server PHP berjalan!';
+                } else if (error.message.includes('CORS')) {
+                    errorMessage = 'CORS error. Cek konfigurasi backend/config/cors.php';
+                }
+
+                resultDiv.innerHTML = `
+                    <strong>${endpoint.name}</strong> ❌<br>
+                    Error: ${errorMessage}<br>
+                    URL: ${API_BASE_URL}${endpoint.url}
+                `;
+            }
+        }
+
+        async function testAllConnections() {
+            clearLogs();
+            log('Memulai test koneksi...');
+            
+            // Test basic connectivity first
+            log('Testing basic server connectivity...');
+            
+            for (const endpoint of endpoints) {
+                await testEndpoint(endpoint);
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log('Test selesai!');
+        }
+
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            log('Halaman dimuat. Siap untuk testing koneksi.');
+        });
+    </script>
+</body>
+</html>
